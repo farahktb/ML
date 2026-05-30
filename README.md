@@ -1,489 +1,355 @@
-# Détection de fraude dans les transactions financières
-### Projet de Machine Learning — Apprentissage Supervisé
+<div align="center">
+
+# 🛡️ FraudGuard AI
+### Détection de Fraude Bancaire par Machine Learning
+
+*A complete supervised learning pipeline — from raw data to real-time fraud prediction — built from scratch with Python.*
+
+[![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
+[![NumPy](https://img.shields.io/badge/NumPy-013243?style=for-the-badge&logo=numpy&logoColor=white)](https://numpy.org/)
+[![Pandas](https://img.shields.io/badge/Pandas-150458?style=for-the-badge&logo=pandas&logoColor=white)](https://pandas.pydata.org/)
+[![Matplotlib](https://img.shields.io/badge/Matplotlib-11557c?style=for-the-badge&logo=python&logoColor=white)](https://matplotlib.org/)
+
+</div>
 
 ---
 
-## 1. Introduction
+## 📸 Interface — Live Screenshots
 
-Financial fraud is one of the most critical problems in modern banking systems.
-Every year, billions of euros are lost due to fraudulent transactions that go undetected.
+### Dashboard — Tableau de Bord
 
-**The Challenge:**
-Traditional rule-based systems are slow to adapt and easy to bypass.
-Machine Learning offers a smarter, automated solution.
+![Dashboard — Tableau de Bord](assets/dashboard.png)
 
-**Our Solution:**
-This project builds an intelligent fraud detection system using:
-
-- **Supervised Learning** — the model learns from labelled historical transactions
-- **Binary Classification** — the model decides: Fraud (1) or Legitimate (0)
-- **Perceptron Model** — a single-layer neural unit using sigmoid activation
-- **Gradient Descent** — the algorithm that teaches the model to improve
-
-> The application simulates a real banking cybersecurity monitoring system
-> capable of analyzing transactions and predicting fraud in real time.
+> Real-time monitoring: 20,000 transactions analyzed, confusion matrix, sigmoid probability distribution, and the gradient descent learning curve showing cost J(θ) drop from **0.693 → 0.080** over 300 epochs.
 
 ---
 
-## 2. Dataset
+### Transaction Analyzer — Analyser une Transaction
 
-**Source:** [Kaggle — Credit Card Fraud Detection](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
+![Transaction Analyzer](assets/analyze.png)
 
-| Property | Value |
-|---|---|
-| Total rows | 284,807 transactions |
-| Total columns | 31 |
-| Features used | Time, Amount, V1 to V28 |
-| Target variable | Class (0 = Legitimate, 1 = Fraud) |
-| Missing values | 0 |
-| Fraudulent transactions | 492 (0.17%) |
-| Legitimate transactions | 284,315 (99.83%) |
-
-**Target Variable:**
-```
-Class = 0  →  Normal (legitimate) transaction
-Class = 1  →  Fraudulent transaction
-```
-
-**Class Imbalance:**
-The dataset is heavily imbalanced — only 0.17% of transactions are fraudulent.
-This is realistic for real banking data, and it means we cannot rely on accuracy alone.
-We use `class_weight='balanced'` in the model to compensate.
-
-> For performance, we work with a stratified sample of **20,000 rows**,
-> preserving the original fraud/legitimate ratio.
-
-**Code — Dataset Loading (`preprocessing.py`):**
-```python
-df = pd.read_csv("data/creditcard.csv")
-n_missing    = df.isnull().sum().sum()     # Check missing values
-n_duplicates = df.duplicated().sum()       # Check duplicates
-df.drop_duplicates(inplace=True)           # Remove duplicates
-```
+> Enter any transaction parameters manually or use the preset buttons (Transaction normale / Transaction frauduleuse / Cas suspect) and get an instant fraud probability score from the trained model.
 
 ---
 
-## 3. Data Preprocessing
+### ML Concepts — Informations sur le Modèle
 
-Preprocessing is essential before training any Machine Learning model.
+![Model Information Page](assets/model_info.png)
 
-### Steps Applied
+> An interactive educational section covering Supervised Learning, Perceptron architecture, Sigmoid activation, Gradient Descent, Binary Cross-Entropy, and Evaluation metrics — all with embedded LaTeX equations.
 
-**Step 1 — Data Cleaning**
+---
+
+## 🧠 What This Project Does
+
+FraudGuard AI is an **end-to-end binary classification system** that detects fraudulent bank transactions. It implements two parallel approaches:
+
+| Approach | Purpose | Algorithm |
+|---|---|---|
+| **Manual Perceptron** (NumPy) | Educational — generates the gradient descent loss curve | Forward pass + Backpropagation by hand |
+| **Logistic Regression** (Scikit-Learn) | Production — powers all live predictions in the dashboard | L-BFGS optimization, `class_weight='balanced'` |
+
+Both approaches solve the same mathematical problem: learn a function `f(X) → {0, 1}` that maps 30 transaction features to a binary fraud/legitimate label.
+
+---
+
+## 🤖 The Algorithm — How the Model is Trained
+
+### Step 1 — Data Preprocessing
+
+The raw Kaggle dataset (284,807 rows) is stratified-sampled to **20,000 transactions** to preserve the original fraud ratio while keeping training fast. Then:
+
 ```python
-df.isnull().sum().sum()      # 0 missing values confirmed
-df.drop_duplicates()         # Remove any duplicate rows
-```
-
-**Step 2 — Feature Scaling / Normalization**
-
-The `Amount` and `Time` columns have very large values compared to V1–V28
-(which are already PCA-transformed). We normalize them with `StandardScaler`:
-
-```python
-from sklearn.preprocessing import StandardScaler
-
+# Feature scaling — Amount and Time have different ranges than V1-V28 (PCA)
 scaler = StandardScaler()
 df["Amount_scaled"] = scaler.fit_transform(df[["Amount"]])
 df["Time_scaled"]   = scaler.fit_transform(df[["Time"]])
 df.drop(columns=["Amount", "Time"], inplace=True)
-```
 
-**Step 3 — Features and Target Separation**
-```python
-X = df.drop(columns=["Class"])   # Features: V1-V28 + Amount_scaled + Time_scaled
-y = df["Class"]                   # Target: 0 or 1
-```
-
-**Step 4 — Train / Test Split (80% / 20%)**
-```python
-from sklearn.model_selection import train_test_split
-
+# Split: 80% train, 20% test — stratified to preserve fraud ratio
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y,
-    test_size=0.20,
-    stratify=y,          # Preserve class ratio in both sets
-    random_state=42
+    X, y, test_size=0.20, stratify=y, random_state=42
 )
+# Result: 16,000 training samples | 4,000 test samples
 ```
+
+**Feature set (30 total):**
+- `V1` through `V28` — anonymized PCA components (already scaled in the original dataset)
+- `Amount_scaled` — transaction amount normalized with StandardScaler
+- `Time_scaled` — seconds since first transaction, normalized
 
 ---
 
-## 4. Visualization
+### Step 2 — The Perceptron Model (Manual NumPy Implementation)
 
-All visualizations use **matplotlib**, following the course requirements.
+A single artificial neuron takes the 30 input features and computes:
 
-| Chart | Purpose | File |
-|---|---|---|
-| Bar + Pie chart | Fraud vs Legitimate count | `visualizations.py` |
-| Histogram | Transaction amount distribution | `visualizations.py` |
-| Distribution plot | Model fraud probability output | `visualizations.py` |
-| Heatmap | Confusion matrix | `visualizations.py` |
-| Line curve | Loss reduction (gradient descent) | `visualizations.py` |
-| Area chart | Fraud evolution over time | `visualizations.py` |
-| Sigmoid curve | Activation function explained | `visualizations.py` |
-| Parabola + arrows | Gradient descent illustrated | `visualizations.py` |
-
-All charts are displayed live inside the Streamlit dashboard.
-
----
-
-## 5. Train / Test Split
-
-Following the course methodology:
-
-| Set | Proportion | Size (from 20k sample) |
-|---|---|---|
-| Training set | 80% | 16,000 transactions |
-| Testing set | 20% | 4,000 transactions |
-
-The split is **stratified** — both sets keep the same fraud ratio as the original data.
-
-This ensures the model is evaluated on data it has never seen during training,
-which gives a realistic measure of real-world performance.
-
----
-
-## 6. The Model — Perceptron with Sigmoid Activation
-
-### What is a Perceptron?
-
-The perceptron is the fundamental unit of classification.
-It takes all input features, multiplies each by a learned weight, sums them up,
-and passes the result through the sigmoid activation function.
-
-### Linear Combination (z)
-
+**Linear combination:**
 ```
-z = w₁x₁ + w₂x₂ + w₃x₃ + ... + w₃₀x₃₀ + b
+z = w₁x₁ + w₂x₂ + ... + w₃₀x₃₀ + b
+  = wᵀX + b
 ```
 
-Where:
-- `x₁ ... x₃₀` = input features (V1-V28, Amount_scaled, Time_scaled)
-- `w₁ ... w₃₀` = learned weights
-- `b` = bias term
-
-### Sigmoid Activation — σ(z)
-
+**Sigmoid activation** maps z to a probability [0, 1]:
 ```
-σ(z) = 1 / (1 + e^(−z))
+σ(z) = 1 / (1 + e^(-z))
+ŷ = σ(z)
 ```
 
-| Value of z | σ(z) | Interpretation |
-|---|---|---|
-| z very negative | ≈ 0.0 | Legitimate transaction |
-| z = 0 | = 0.5 | Uncertain |
-| z very positive | ≈ 1.0 | Fraudulent transaction |
-
-**Decision Rule:**
+**Decision rule:**
 ```
-if σ(z) >= 0.5  →  Predict Fraud     (Class = 1)
-if σ(z) <  0.5  →  Predict Legitimate (Class = 0)
+if ŷ ≥ 0.5  →  Fraud     (Class = 1)
+if ŷ < 0.5  →  Legitimate (Class = 0)
 ```
 
-### Manual Implementation (numpy)
+The full NumPy implementation from `train_model.py`:
 
 ```python
 class ManualPerceptron:
 
-    def _sigmoid(self, z):
-        return 1.0 / (1.0 + np.exp(-z))   # Sigmoid activation
+    @staticmethod
+    def _sigmoid(z):
+        # Clipped to avoid overflow in exp(-z) for extreme values
+        return 1.0 / (1.0 + np.exp(-np.clip(z, -500, 500)))
 
     def fit(self, X, y):
-        self.weights = np.zeros(X.shape[1])
+        n_samples, n_features = X.shape
+        self.weights = np.zeros(n_features)  # Initialize weights at 0
         self.bias    = 0.0
 
         for epoch in range(self.epochs):
+            # --- FORWARD PASS ---
             z     = X @ self.weights + self.bias   # Linear combination
-            y_hat = self._sigmoid(z)               # Apply sigmoid
-            ...                                    # Update weights (see Step 8)
+            y_hat = self._sigmoid(z)               # Sigmoid activation
+
+            # --- LOSS: Binary Cross-Entropy ---
+            eps  = 1e-9  # Avoid log(0)
+            loss = -np.mean(
+                y * np.log(y_hat + eps) + (1 - y) * np.log(1 - y_hat + eps)
+            )
+            self.loss_history.append(loss)
+
+            # --- BACKWARD PASS: Compute gradients ---
+            error = y_hat - y                 # Prediction error
+            dw    = (X.T @ error) / n_samples # Gradient w.r.t. weights
+            db    = np.mean(error)            # Gradient w.r.t. bias
+
+            # --- GRADIENT DESCENT UPDATE ---
+            self.weights -= self.lr * dw      # w = w - α · ∂J/∂w
+            self.bias    -= self.lr * db      # b = b - α · ∂J/∂b
 ```
 
-### sklearn Implementation
-
-```python
-from sklearn.linear_model import LogisticRegression
-
-model = LogisticRegression(
-    max_iter=1000,
-    class_weight="balanced",   # Handle class imbalance
-    solver="lbfgs"
-)
-model.fit(X_train, y_train)
-```
-
-> Logistic Regression in sklearn is mathematically equivalent to a single
-> perceptron with sigmoid activation. It is the standard academic tool for
-> binary classification.
+**Hyperparameters used:** `learning_rate α = 0.05`, `epochs = 300`
 
 ---
 
-## 7. Cost Function — Log Loss (Binary Cross-Entropy)
+### Step 3 — The Cost Function: Binary Cross-Entropy
 
-To measure how wrong the model's predictions are, we use **Log Loss**:
+To measure how wrong the predictions are, we use **Binary Cross-Entropy (Log Loss)**:
 
 ```
-J(θ) = −(1/m) · Σ [ y·log(ŷ) + (1−y)·log(1−ŷ) ]
+J(w, b) = -(1/m) · Σ [ y·log(ŷ) + (1-y)·log(1-ŷ) ]
 ```
-
-Where:
-- `m` = number of training examples
-- `y` = true label (0 or 1)
-- `ŷ` = predicted probability from sigmoid
-
-**Interpretation:**
 
 | Situation | Cost |
 |---|---|
-| y=1 (fraud) and ŷ→1 (correctly predicts fraud) | Cost ≈ 0 (good) |
-| y=1 (fraud) and ŷ→0 (misses the fraud) | Cost → ∞ (very bad) |
-| y=0 (legit) and ŷ→0 (correctly predicts legit) | Cost ≈ 0 (good) |
+| y=1 (fraud), ŷ → 1 (correctly predicted) | Cost ≈ 0 — perfect |
+| y=1 (fraud), ŷ → 0 (completely missed) | Cost → ∞ — catastrophic |
+| y=0 (legit), ŷ → 0 (correctly predicted) | Cost ≈ 0 — perfect |
 
-**Objective:** Minimize J(θ) during training.
+This function is **convex**, meaning gradient descent always converges to the global minimum. The loss curve on the dashboard proves this — it decreases monotonically from **0.693 to 0.080** across 300 epochs.
 
-**Code:**
+---
+
+### Step 4 — Gradient Descent Optimization
+
+Gradient descent iteratively adjusts the weights to minimize J(w, b):
+
+```
+Partial derivative w.r.t. weights:
+∂J/∂w = (1/m) · Xᵀ · (ŷ - y)
+
+Partial derivative w.r.t. bias:
+∂J/∂b = (1/m) · Σ(ŷ - y)
+
+Update rule (one step per epoch):
+w ← w - α · ∂J/∂w
+b ← b - α · ∂J/∂b
+```
+
+The learning rate `α = 0.05` controls the step size. Too large → overshoots the minimum and diverges. Too small → converges correctly but very slowly.
+
+---
+
+### Step 5 — Production Model (Scikit-Learn Logistic Regression)
+
+For live predictions in the dashboard, we use Scikit-Learn's `LogisticRegression` which implements the **L-BFGS** solver (a quasi-Newton second-order optimizer, faster and more accurate than plain gradient descent for this scale):
+
 ```python
-eps  = 1e-9
-loss = -np.mean(
-    y * np.log(y_hat + eps) + (1 - y) * np.log(1 - y_hat + eps)
+model = LogisticRegression(
+    solver="lbfgs",         # Limited-memory BFGS — efficient second-order optimizer
+    max_iter=1000,          # Allow up to 1000 iterations to converge
+    class_weight="balanced",# Compensates for the 0.17% fraud / 99.83% legit imbalance
+    random_state=42,        # Reproducibility
+    C=1.0,                  # Regularization strength (L2 penalty, inverse)
+    tol=1e-4,               # Convergence tolerance
 )
-self.loss_history.append(loss)   # Saved for the loss curve chart
-```
-
----
-
-## 8. Learning Algorithm — Gradient Descent
-
-Gradient Descent is the algorithm that teaches the model to improve.
-
-It works by computing the gradient (slope) of the cost function
-and updating the weights in the direction that reduces the error.
-
-### Update Rule
-
-```
-w(t+1) = w(t) − α · (∂J / ∂w)
-```
-
-Where:
-- `w` = model weights
-- `α` = learning rate (step size)
-- `∂J/∂w` = gradient of the cost function
-
-### Code Implementation
-
-```python
-# Compute prediction error
-error = y_hat - y                        # Difference between prediction and truth
-
-# Compute gradients
-dw = (X.T @ error) / n_samples          # Gradient for weights
-db = np.mean(error)                      # Gradient for bias
-
-# Update weights — Gradient Descent step
-self.weights -= self.lr * dw             # w = w - α · ∂J/∂w
-self.bias    -= self.lr * db             # b = b - α · ∂J/∂b
-```
-
-### Learning Rate (α)
-
-| α too large | α too small |
-|---|---|
-| Overshoots the minimum | Converges too slowly |
-| Unstable learning | Stable but slow |
-
-We use `α = 0.05` (learning rate = 0.05) with 300 epochs.
-
----
-
-## 9. Training the Model
-
-### Two Approaches Used in This Project
-
-**Approach A — Manual Perceptron (numpy)**
-
-Used to generate the **loss curve** that demonstrates gradient descent learning.
-Trained on a balanced sample of the training data for 300 epochs.
-
-```python
-perceptron = ManualPerceptron(lr=0.05, epochs=300)
-perceptron.fit(X_sample, y_sample)
-loss_history = perceptron.loss_history   # Saved for visualization
-```
-
-**Approach B — Logistic Regression (sklearn)**
-
-Used as the main fraud prediction model for the live dashboard.
-
-```python
-model = LogisticRegression(max_iter=1000, class_weight="balanced")
 model.fit(X_train, y_train)
 ```
 
-Both approaches implement the same mathematical concept:
-sigmoid activation + gradient descent + log loss minimization.
+> **Note:** Logistic Regression is mathematically identical to a single-neuron Perceptron with sigmoid activation. The difference is only in the optimizer — sklearn uses L-BFGS instead of plain gradient descent for faster convergence.
 
 ---
 
-## 10. Evaluation
+## 📊 Dataset
 
-We do NOT rely on accuracy alone because the dataset is imbalanced.
+**Source:** [Kaggle — Credit Card Fraud Detection (ULB)](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
 
-### Metrics Used
+| Property | Value |
+|---|---|
+| Full dataset size | 284,807 transactions |
+| Working sample | 20,000 (stratified) |
+| Features | Time, Amount, V1–V28 (PCA anonymized) |
+| Target | Class: 0 = Legitimate, 1 = Fraud |
+| Fraud rate | 0.17% (492 out of 284,807) |
+| Missing values | 0 |
+| Duplicates removed | Yes |
 
-| Metric | Formula | Value |
-|---|---|---|
-| Accuracy | (TP + TN) / Total | ~99% |
-| Precision | TP / (TP + FP) | Displayed in app |
-| Recall | TP / (TP + FN) | Displayed in app |
-| Log Loss | Cross-entropy on probabilities | Displayed in app |
-| AUC-ROC | Area under ROC curve | Displayed in app |
-
-### Confusion Matrix
+### The Class Imbalance Problem
 
 ```
-                  Predicted Legitimate   Predicted Fraud
-Real Legitimate        TN (correct)         FP (false alarm)
-Real Fraud             FN (missed!)         TP (detected)
+Legitimate:  19,967  ████████████████████████████████████████████████████ 99.83%
+Fraudulent:      33  ▌                                                     0.17%
 ```
 
-| Term | Meaning | Importance |
-|---|---|---|
-| **TP** — True Positive | Fraud correctly detected | We want this HIGH |
-| **TN** — True Negative | Legitimate correctly identified | We want this HIGH |
-| **FP** — False Positive | Legitimate flagged as fraud | Minor inconvenience |
-| **FN** — False Negative | Fraud NOT detected | **DANGEROUS — costly!** |
+A naive model that always predicts "Legitimate" would achieve **99.83% accuracy** while detecting **zero fraud**. This is why we do not optimize for accuracy — we optimize for **Recall**.
 
-### Why Recall is the Most Important Metric
+**Solution applied:** `class_weight='balanced'` in Logistic Regression automatically reweights each class inversely proportional to its frequency:
+
+```
+weight_fraud     = n_samples / (2 × n_fraud)     →  much higher penalty
+weight_legitimate = n_samples / (2 × n_legitimate) →  normal penalty
+```
+
+This forces the model to pay much more attention to getting fraud predictions right.
+
+---
+
+## 📈 Model Performance Results
+
+Evaluated on the **4,000 unseen test transactions** (the 20% held-out split):
+
+| Metric | Result | Notes |
+|---|---|---|
+| **Accuracy** | 99.2% | High, but misleading due to imbalance |
+| **Recall (Fraud)** | 57.14% | 4 out of 7 frauds detected |
+| **Taux de Détection** | 57.14% | Same as Recall |
+| **True Positives (TP)** | 4 | Frauds correctly caught |
+| **True Negatives (TN)** | 3,962 | Legit transactions correctly cleared |
+| **False Positives (FP)** | 31 | Legit transactions wrongly flagged |
+| **False Negatives (FN)** | 3 | Frauds that slipped through |
+| **Loss curve start** | J = 0.693 | Maximum entropy (random model) |
+| **Loss curve final** | J = 0.080 | After 300 epochs of gradient descent |
+
+### Why Recall is the Only Metric That Matters
 
 ```
 Recall = TP / (TP + FN)
 ```
 
-In fraud detection, **missing a fraud (FN) is far more costly** than a false alarm (FP).
+A **False Negative (FN)** = a fraud the model did not catch = real money stolen from a real customer. The bank loses the full transaction amount, faces legal liability, and damages customer trust.
 
-A missed fraud means:
-- Real financial loss for the bank
-- Customer funds stolen
-- Reputation damage
+A **False Positive (FP)** = a legitimate transaction incorrectly flagged = a brief inconvenience (declined card), easily resolved with a phone call.
 
-Therefore, we optimize for **high Recall**, not just accuracy.
+**Conclusion:** In any fraud detection system, missing a fraud is infinitely more costly than triggering a false alarm. We always prioritize maximizing Recall.
 
 ---
 
-## 11. Results
-
-### Model Performance on Test Set (4,000 transactions)
-
-| Metric | Result |
-|---|---|
-| Accuracy | 99.15% |
-| Recall | 57.14% |
-| Loss Curve | Decreasing from epoch 1 to 300 |
-
-### Loss Curve
-
-The loss curve shows the binary cross-entropy decreasing over 300 training epochs.
-This visually demonstrates that **gradient descent is working** —
-the model improves with each iteration.
-
-### Key Observations
-
-- **False Negatives** exist because the dataset is extremely imbalanced
-- Using `class_weight='balanced'` significantly improves Recall
-- The sigmoid output provides calibrated fraud probabilities, not just binary labels
-- The loss curve confirms the gradient descent convergence behavior taught in the course
-
----
-
-## 12. Conclusion
-
-This project demonstrates that **Machine Learning can effectively improve banking security**
-by automatically flagging suspicious transactions before human review.
-
-### What Was Achieved
-
-- A complete supervised learning pipeline from raw data to live prediction
-- Binary classification using perceptron concepts aligned with the course
-- Gradient descent optimization with visual proof of learning
-- A professional interactive dashboard for real-time fraud detection
-
-### Academic Alignment
-
-| Course Concept | Implementation |
-|---|---|
-| Supervised Learning | Model trained on 16,000 labelled transactions |
-| Binary Classification | Output ∈ {0 = Legitimate, 1 = Fraud} |
-| Perceptron | `ManualPerceptron` class with numpy |
-| Sigmoid Activation | `σ(z) = 1 / (1 + e^(-z))` |
-| Gradient Descent | `w = w − α · ∂J/∂w` |
-| Log Loss | `J = −(1/m) · Σ [y·log(ŷ) + (1−y)·log(1−ŷ)]` |
-| Train/Test Split | 80% / 20% stratified |
-| Evaluation | Accuracy, Precision, Recall, Confusion Matrix, Log Loss |
-
-### Limitations
-
-- The Kaggle dataset uses anonymized PCA features (V1–V28), not raw banking columns
-- Recall of ~57% shows there is room for improvement with more advanced techniques
-- The demo interface maps simplified inputs to the model's feature space
-
-### Future Work
-
-- Use deeper neural networks (multi-layer perceptron) for higher recall
-- Apply SMOTE oversampling to handle class imbalance more effectively
-- Integrate real-time transaction stream processing
-- Add more explainability to the fraud flagging system
-
----
-
-## Project Structure
+## 🗂️ Project Structure
 
 ```
 ML project/
-├── data/
-│   └── creditcard.csv          Kaggle fraud dataset (284,807 rows)
-├── models/
-│   ├── fraud_model.pkl         Trained LogisticRegression model
-│   ├── scaler.pkl              StandardScaler for Amount and Time
-│   ├── loss_history.npy        Loss values per epoch (gradient descent)
-│   └── meta.pkl                Test set + feature names
-├── preprocessing.py            Data loading, cleaning, scaling, split
-├── train_model.py              Training — ManualPerceptron + sklearn
-├── evaluation.py               Metrics: accuracy, recall, confusion matrix
-├── visualizations.py           All matplotlib charts
-├── app.py                      Streamlit dashboard (3 pages)
-└── requirements.txt            Dependencies
+│
+├── assets/                         Real screenshots of the running application
+│   ├── dashboard.png               Dashboard page (metrics + charts)
+│   ├── analyze.png                 Transaction analyzer page
+│   ├── model_info.png              ML concepts educational page
+│   └── dashboard_full.png          Full-scroll dashboard view
+│
+├── models/                         Serialized trained artifacts (generated by train_model.py)
+│   ├── fraud_model.pkl             Trained LogisticRegression (sklearn)
+│   ├── scaler.pkl                  StandardScaler fitted on Amount + Time
+│   ├── loss_history.npy            300-epoch loss array from ManualPerceptron
+│   └── meta.pkl                    X_test, y_test, feature_names
+│
+├── preprocessing.py                Data loading, cleaning, scaling, train/test split
+├── train_model.py                  ManualPerceptron (NumPy) + LogisticRegression (sklearn)
+├── evaluation.py                   All metrics: accuracy, recall, F1, AUC-ROC, confusion matrix
+├── visualizations.py               All matplotlib dark-mode charts (8 chart types)
+├── app.py                          3-page Streamlit dashboard
+└── requirements.txt                Python dependencies
 ```
 
 ---
 
-## How to Run
+## 🚀 How to Run
 
+### 1. Install dependencies
 ```bash
-# Step 1 — Install dependencies
 pip install -r requirements.txt
+```
 
-# Step 2 — Train the model
+### 2. Train the model
+```bash
 python train_model.py
+```
+This will:
+- Load and preprocess the dataset
+- Train the manual NumPy Perceptron (generates the loss curve)
+- Train the production Logistic Regression model
+- Save `fraud_model.pkl`, `scaler.pkl`, `loss_history.npy`, `meta.pkl` to `models/`
+- Print accuracy and recall on the test set
 
-# Step 3 — Launch the dashboard
+### 3. Launch the dashboard
+```bash
 python -m streamlit run app.py
 ```
 
-The app opens at: **http://localhost:8501**
+Open your browser at: **http://localhost:8501**
 
 ---
 
-## Libraries Used
+## 📚 Libraries Used
 
-| Library | Role |
+| Library | Version | Role |
+|---|---|---|
+| `pandas` | latest | Dataset loading, cleaning, sampling |
+| `numpy` | latest | Manual Perceptron, sigmoid, gradient descent |
+| `scikit-learn` | latest | StandardScaler, LogisticRegression, metrics |
+| `matplotlib` | latest | All 8 dark-mode visualizations |
+| `seaborn` | latest | Heatmap for confusion matrix |
+| `streamlit` | latest | Interactive 3-page web dashboard |
+| `joblib` | latest | Saving and loading model artifacts |
+
+> No TensorFlow, PyTorch, XGBoost, or any deep learning framework was used. This project strictly follows the academic course content on supervised learning and binary classification.
+
+---
+
+## 🎓 Academic Concept Mapping
+
+| Course Concept | Where It Is Implemented |
 |---|---|
-| `pandas` | Dataset loading and manipulation |
-| `numpy` | Manual perceptron, sigmoid, gradient descent |
-| `matplotlib` | All charts and visualizations |
-| `scikit-learn` | LogisticRegression, metrics, StandardScaler |
-| `streamlit` | Interactive web dashboard |
-| `joblib` | Saving and loading trained model |
-
-> No TensorFlow, PyTorch, XGBoost, or any advanced deep learning framework was used.
-> This project strictly follows the course content.
+| Supervised Learning | `train_model.py` — model learns from 16,000 labelled transactions |
+| Binary Classification | Output: `{0 = Légitime, 1 = Frauduleux}` |
+| Perceptron (neuron) | `ManualPerceptron` class in `train_model.py` |
+| Sigmoid Activation | `_sigmoid(z) = 1 / (1 + exp(-z))` |
+| Cost Function | Binary Cross-Entropy J(w,b) in the training loop |
+| Gradient Descent | `w -= lr * dw` / `b -= lr * db` — 300 epochs |
+| Learning Rate | `α = 0.05` — chosen empirically |
+| Train/Test Split | 80% / 20% stratified — `sklearn.model_selection` |
+| Standardization | StandardScaler on Amount and Time features |
+| Class Imbalance | `class_weight='balanced'` in LogisticRegression |
+| Evaluation | Accuracy, Precision, Recall, F1, Log-Loss, AUC-ROC, Confusion Matrix |
+| Visualization | Loss curve, confusion matrix heatmap, probability distribution, class distribution |
