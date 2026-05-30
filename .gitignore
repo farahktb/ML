@@ -1,7 +1,3 @@
-# Dataset — too large for GitHub (150 MB)
-creditcard.csv
-data/creditcard.csv
-
 # Python cache
 __pycache__/
 *.py[cod]
